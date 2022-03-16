@@ -1,0 +1,62 @@
+version: '3.5'
+
+networks:
+  mynetwork:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${SUBNET_IP}/${SUBNET_MASK}
+
+volumes:
+  mysql:
+    driver: local
+
+services:
+### NGINX ################################################
+    nginx:
+      build:
+        context: ./nginx
+      ports:
+        - "80:80"
+        - "443:443"
+      volumes:
+        - ${APP_PATH}:/var/www:cached
+        - ./nginx/sites:/etc/nginx/sites-available
+      links:
+        - php
+      depends_on:
+        - php
+      networks:
+        - mynetwork
+### PHP ##################################################
+    php:
+      build:
+        args:
+          USER: ${USER}
+          UID: ${UID}
+          GROUP: ${GROUP}
+          GID: ${GID}
+        context: ./php
+      volumes:
+        - ${APP_PATH}:/var/www:cached
+      environment:
+        COMPOSER_MEMORY_LIMIT: 2G
+        XDEBUG_CONFIG: client_host=${XDEBUG_REMOTE_HOST} client_port=${XDEBUG_CLIENT_PORT} remote_enable=1
+        PHP_IDE_CONFIG: serverName=${XDEBUG_IDE_KEY}
+      links:
+        - mysql
+      networks:
+        - mynetwork
+### MYSQL ################################################
+    mysql:
+      build: ./mysql
+      ports:
+        - "3306:3306"
+      environment:
+          MYSQL_DATABASE: ${MYSQL_DATABASE}
+          MYSQL_USER: ${MYSQL_USER}
+          MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+          MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      networks:
+        - mynetwork
